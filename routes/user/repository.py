@@ -3,7 +3,8 @@ from routes.user.model import *
 from sqlalchemy.orm import Session
 from entities import *
 from response_model import ResponseModel
-
+from typing import List, Dict
+# from app.models import Client, Pawn
 from sqlalchemy.sql import func, or_, and_
 from sqlalchemy.exc import SQLAlchemyError
 from collections import defaultdict
@@ -204,28 +205,6 @@ class Staff:
             message="Pawn created successfully"
         )
         
-    # def get_product(self, db: Session):
-    #     products = db.query(Product).all()
-    #     if not products:
-    #         raise HTTPException(
-    #             status_code=404,
-    #             detail="Products not found",
-    #         )
-    #     serialized_products = [
-    #         {
-    #             "id": product.prod_id,
-    #             "name": product.prod_name,
-    #             "price": product.unit_price,
-    #             "amount": product.amount,
-    #         }
-    #         for product in products
-    #     ]
-    #     return ResponseModel(
-    #         code=200,
-    #         status="Success",
-    #         result=serialized_products
-    #     )
-    
     def get_product(self, db: Session):
         products = db.query(Product).all()
         if not products:
@@ -233,30 +212,15 @@ class Staff:
                 status_code=404,
                 detail="Products not found",
             )
-        serialized_products = []
-        for product in products:
-            # Default values
-            unit_price = product.unit_price
-            amount = product.amount  # Default to product.amount
-            order_amount = None  # Default in case no OrderDetail exists
-            
-            # Check and fallback for unit_price and amount
-            if unit_price is None or amount is None:
-                order_detail = db.query(OrderDetail).filter(
-                    OrderDetail.prod_id == product.prod_id
-                ).first()
-                if order_detail:
-                    unit_price = unit_price or order_detail.product_buy_price
-                    amount = amount or order_detail.order_amount  # Fallback for amount
-    
-            serialized_products.append(
-                {
-                    "id": product.prod_id,
-                    "name": product.prod_name,
-                    "price": unit_price,
-                    "amount": amount,  # Use the fallback value
-                }
-            )
+        serialized_products = [
+            {
+                "id": product.prod_id,
+                "name": product.prod_name,
+                "price": product.unit_price,
+                "amount": product.amount,
+            }
+            for product in products
+        ]
         return ResponseModel(
             code=200,
             status="Success",
@@ -322,9 +286,6 @@ class Staff:
             status="Success",
             result=serialized_products
         )
-
-
-
 
 
     def get_client(self, db: Session):
@@ -539,3 +500,326 @@ class Staff:
             result=get_detail_pawn
         )
         
+    def delete_product_by_id(self, product_id: int, db: Session):
+        """
+        Deletes a product by its ID.
+        """
+        product = db.query(Product).filter(Product.prod_id == product_id).first()
+        if not product:
+            # Instead of raising an exception, return a success message
+            return ResponseModel(
+                code=200,
+                status="Success",
+                message=f"Product with ID {product_id} not found but considered deleted"
+            )
+
+        try:
+            db.delete(product)
+            db.commit()
+            return ResponseModel(
+                code=200,
+                status="Success",
+                message=f"Product with ID {product_id} deleted successfully"
+            )
+        except SQLAlchemyError as e:
+            db.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail=f"Database error occurred: {str(e)}",
+            )
+
+
+    def delete_product_by_name(self, product_name: str, db: Session):
+        """
+        Deletes a product by its name.
+        """
+        product = db.query(Product).filter(func.lower(Product.prod_name) == func.lower(product_name)).first()
+        if not product:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Product with name '{product_name}' not found",
+            )
+        
+        try:
+            db.delete(product)
+            db.commit()
+            return ResponseModel(
+                code=200,
+                status="Success",
+                message=f"Product with name '{product_name}' deleted successfully"
+            )
+        except SQLAlchemyError as e:
+            db.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail=f"Database error occurred: {str(e)}",
+            )
+
+    def delete_all_products(self, db: Session):
+        """
+        Deletes all products from the database.
+        """
+        try:
+            num_deleted = db.query(Product).delete()
+            db.commit()
+            return ResponseModel(
+                code=200,
+                status="Success",
+                message=f"All products deleted successfully. Total deleted: {num_deleted}",
+            )
+        except SQLAlchemyError as e:
+            db.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail=f"Database error occurred: {str(e)}",
+            )
+            
+    def get_product_by_id(self, product_id: int, db: Session) -> Dict:
+        """
+        Fetch a product by its ID and return it in a serialized format.
+        """
+        product = db.query(Product).filter(Product.prod_id == product_id).first()
+        if not product:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Product with ID {product_id} not found"
+            )
+        # Serialize the product
+        return {
+            "id": product.prod_id,  # Changed key name to match the format in `get_product`
+            "name": product.prod_name,
+            "price": product.unit_price,
+            "amount": product.amount,
+        }
+        
+    def get_product_by_name(self, product_name: str, db: Session) -> List[Dict]:
+        """
+        Fetch products by their name and return them in a serialized format.
+        """
+        products = db.query(Product).filter(Product.prod_name.ilike(f"%{product_name}%")).all()
+        if not products:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No products found with name '{product_name}'"
+            )
+        # Serialize the products
+        return [
+            {
+                "id": product.prod_id,  # Changed key name to match the format in `get_product`
+                "name": product.prod_name,
+                "price": product.unit_price,
+                "amount": product.amount,
+            }
+            for product in products
+        ]
+ 
+    def get_last_product_id(self, db: Session):
+        try:
+            # Get the last product by `prod_id`
+            last_product = db.query(Product).order_by(Product.prod_id.desc()).first()
+            if not last_product:
+                raise HTTPException(
+                    status_code=404,
+                    detail="No products found in the database."
+                )
+            next_prodict_id = last_product.prod_id + 1
+            return {"last_product_id": next_prodict_id}
+        except SQLAlchemyError as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Database error occurred: {str(e)}"
+            )
+
+    def get_last_client_id(self, db: Session):
+        # Get the most recent client/user based on their ID
+        client = db.query(Account).filter(Account.role == "user").order_by(Account.cus_id.desc()).first()
+        if not client:
+            raise HTTPException(
+                status_code=404,
+                detail="No clients found in the database."
+            )
+        next_client_id = client.cus_id + 1
+    
+        return ResponseModel(
+            code=200,
+            status="Success",
+            result={
+                "id": next_client_id,
+                # "name": client.cus_name,
+                # "phone_number": client.phone_number,
+                # "address": client.address,
+            }
+        )  
+        
+    def get_last_order_id(self, db: Session):
+        last_order_id = (
+            db.query(Order.order_id)
+            .order_by(Order.order_id.desc())  # Get latest order ID
+            .limit(1)
+            .scalar()
+        )
+        return {"last_order_id": last_order_id} if last_order_id else {"message": "No orders found"} 
+
+    def update_product(self, product_info: UpdateProduct, db: Session):
+        """
+        Updates only `unit_price` and `amount` of a product.
+        The product is identified using either `product_id` or `product_name`.
+        """
+        product_id = product_info.product_id
+        product_name = product_info.product_name
+    
+        if product_id is None and not product_name:
+            raise HTTPException(status_code=400, detail="Provide either a product ID or product name for update.")
+    
+        # Fetch the product using ID or name
+        query = db.query(Product)
+        
+        if product_id:
+            product = query.filter(Product.prod_id == product_id).first()
+        else:
+            product = query.filter(func.lower(Product.prod_name) == func.lower(product_name)).first()
+    
+        if not product:
+            raise HTTPException(status_code=404, detail="Product not found.")
+    
+        try:
+            # Update only provided fields
+            updated_fields = []
+            if product_info.unit_price is not None:
+                product.unit_price = product_info.unit_price
+                updated_fields.append("unit_price")
+            
+            if product_info.amount is not None:
+                product.amount = product_info.amount
+                updated_fields.append("amount")
+    
+            if not updated_fields:
+                raise HTTPException(status_code=400, detail="No valid fields provided for update.")
+    
+            db.commit()
+            db.refresh(product)
+    
+            return ResponseModel(
+                code=200,
+                status="Success",
+                message=f"Product updated successfully ({', '.join(updated_fields)} updated)."
+            )
+        except SQLAlchemyError as e:
+            db.rollback()
+            raise HTTPException(status_code=500, detail=f"Database error occurred: {str(e)}")
+
+    def get_all_pawns(self, db: Session, cus_id: int = None, cus_name: str = None, phone_number: str = None):
+        """
+        Retrieve all pawn transactions with customer and product details.
+        If search parameters (cus_id, cus_name, phone_number) are provided, filter the records.
+        Otherwise, return all records.
+        """
+        query = (
+            db.query(
+                Account.cus_id,
+                Account.cus_name,
+                Account.phone_number,
+                Account.address,
+                Pawn.pawn_id,
+                Pawn.pawn_deposit,
+                Pawn.pawn_date,
+                Pawn.pawn_expire_date,
+                Product.prod_id,
+                Product.prod_name,
+                PawnDetail.pawn_weight,
+                PawnDetail.pawn_amount,
+                PawnDetail.pawn_unit_price,
+            )
+            .join(Pawn, Account.cus_id == Pawn.cus_id)
+            .join(PawnDetail, Pawn.pawn_id == PawnDetail.pawn_id)
+            .join(Product, PawnDetail.prod_id == Product.prod_id)
+        )
+
+        # ✅ Apply filters if search parameters are provided
+        if cus_id or cus_name or phone_number:
+            query = query.filter(
+                and_(
+                    or_(
+                        (cus_id is not None and Account.cus_id == cus_id),
+                        (cus_name is not None and func.lower(Account.cus_name).contains(func.lower(cus_name))),
+                        (phone_number is not None and Account.phone_number.contains(phone_number)),
+                    ),
+                    Account.role == "user"
+                )
+            )
+
+        query = query.order_by(Pawn.pawn_id.desc())  # Sort by latest pawn records
+        pawns = query.all()
+
+        if not pawns:
+            return ResponseModel(
+                code=200,
+                status="Success",
+                message="No pawn records found",
+                result=[]
+            )
+
+        # ✅ Group the results by cus_id
+        grouped_pawns = defaultdict(lambda: {
+            "cus_id": 0,
+            "customer_name": "",
+            "phone_number": "",
+            "address": "",
+            "pawn_deposit": 0,
+            "pawn_date": "",
+            "pawn_expire_date": "",
+            "products": [],
+        })
+
+        for pawn in pawns:
+            cus_id = pawn[0]  # Extract cus_id
+
+            # Populate customer details only once
+            if not grouped_pawns[cus_id]["customer_name"]:
+                grouped_pawns[cus_id].update({
+                    "cus_id": pawn[0],
+                    "customer_name": pawn[1],
+                    "phone_number": pawn[2],
+                    "address": pawn[3],
+                    "pawn_deposit": pawn[5],
+                    "pawn_date": pawn[6],
+                    "pawn_expire_date": pawn[7],
+                })
+
+            # Add product details
+            product = {
+                "prod_id": pawn[8],
+                "prod_name": pawn[9],
+                "pawn_weight": pawn[10],
+                "pawn_amount": pawn[12],
+                "pawn_unit_price": pawn[11],
+            }
+
+            grouped_pawns[cus_id]["products"].append(product)
+
+        return ResponseModel(
+            code=200,
+            status="Success",
+            result=list(grouped_pawns.values())
+        )
+        
+    def get_next_pawn_id(self, db: Session):
+        """
+        Retrieve the last pawn ID and return the next available ID.
+        """
+        last_pawn = db.query(Pawn.pawn_id).order_by(Pawn.pawn_id.desc()).first()
+        
+        if not last_pawn:
+            return ResponseModel(
+                code=200,
+                status="Success",
+                result={"next_pawn_id": 1}  # If no records exist, start from 1
+            )
+    
+        next_pawn_id = last_pawn.pawn_id + 1
+    
+        return ResponseModel(
+            code=200,
+            status="Success",
+            result={"next_pawn_id": next_pawn_id}
+        )
