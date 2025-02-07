@@ -9,7 +9,7 @@ class OrderDetail(Base):
 
     order_id = Column(Integer, ForeignKey("orders.order_id"), primary_key = True)
     prod_id = Column(Integer, ForeignKey("products.prod_id"), primary_key = True)
-    order_weight = Column(Float, nullable=False)
+    order_weight = Column(String, nullable=False)
     order_amount = Column(Integer, nullable=True)
     product_sell_price = Column(Float, nullable=False)
     product_labor_cost = Column(Float, nullable=False)
@@ -24,7 +24,7 @@ class PawnDetail(Base):
 
     pawn_id = Column(Integer, ForeignKey("pawns.pawn_id"), primary_key = True)
     prod_id = Column(Integer, ForeignKey("products.prod_id"), primary_key = True)
-    pawn_weight = Column(Float, nullable=False)
+    pawn_weight = Column(String, nullable=False)
     pawn_amount = Column(Integer, nullable=False)
     pawn_unit_price = Column(Float, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

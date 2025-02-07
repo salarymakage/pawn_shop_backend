@@ -4,7 +4,7 @@ from typing import Optional
 
 class BuyProducts(BaseModel):
     prod_name: str
-    order_weight: float
+    order_weight: str
     order_amount: int
     product_sell_price: float
     product_labor_cost: float
@@ -12,7 +12,7 @@ class BuyProducts(BaseModel):
     
 class PawnProducts(BaseModel):
     prod_name: str
-    pawn_weight: float
+    pawn_weight: str
     pawn_amount: int
     pawn_unit_price: float
     
@@ -46,3 +46,10 @@ class CreatePawn(BaseModel):
     
 class GetClient(CreateClient):
     cus_id: int
+    
+    
+class UpdateProduct(BaseModel):
+    product_id: Optional[int] = None
+    product_name: Optional[str] = None
+    unit_price: Optional[float] = None
+    amount: Optional[int] = None

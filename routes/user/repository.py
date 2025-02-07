@@ -3,7 +3,6 @@ from routes.user.model import *
 from sqlalchemy.orm import Session
 from entities import *
 from response_model import ResponseModel
-from typing import List, Dict
 
 from sqlalchemy.sql import func, or_, and_
 from sqlalchemy.exc import SQLAlchemyError
@@ -263,6 +262,67 @@ class Staff:
             status="Success",
             result=serialized_products
         )
+    
+    # def get_product(self, db: Session):
+    #     products = db.query(Product).all()
+    #     if not products:
+    #         raise HTTPException(
+    #             status_code=404,
+    #             detail="Products not found",
+    #         )
+    #     serialized_products = []
+    #     for product in products:
+    #         # Default values
+    #         unit_price = product.unit_price
+    #         amount = product.amount  # Default to product.amount
+    #         order_amount = None  # Default in case no OrderDetail exists
+            
+    #         # Check and fallback for unit_price and amount
+    #         if unit_price is None or amount is None:
+    #             order_detail = db.query(OrderDetail).filter(
+    #                 OrderDetail.prod_id == product.prod_id
+    #             ).first()
+    #             if order_detail:
+    #                 unit_price = unit_price or order_detail.product_buy_price
+    #                 amount = amount or order_detail.order_amount  # Fallback for amount
+    
+    #         serialized_products.append(
+    #             {
+    #                 "id": product.prod_id,
+    #                 "name": product.prod_name,
+    #                 "price": unit_price,
+    #                 "amount": amount,  # Use the fallback value
+    #             }
+    #         )
+    #     return ResponseModel(
+    #         code=200,
+    #         status="Success",
+    #         result=serialized_products
+    #     )
+
+
+    def get_product(self, db: Session):
+        products = db.query(Product).all()
+        if not products:
+            raise HTTPException(
+                status_code=404,
+                detail="Products not found",
+            )
+        serialized_products = [
+            {
+                "id": product.prod_id,
+                "name": product.prod_name,
+                "price": product.unit_price,
+                "amount": product.amount,
+            }
+            for product in products
+        ]
+        return ResponseModel(
+            code=200,
+            status="Success",
+            result=serialized_products
+        )
+
 
 
 
@@ -479,112 +539,3 @@ class Staff:
             result=get_detail_pawn
         )
         
-    def delete_product_by_id(self, product_id: int, db: Session):
-        """
-        Deletes a product by its ID.
-        """
-        product = db.query(Product).filter(Product.prod_id == product_id).first()
-        if not product:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Product with ID {product_id} not found",
-            )
-        
-        try:
-            db.delete(product)
-            db.commit()
-            return ResponseModel(
-                code=200,
-                status="Success",
-                message=f"Product with ID {product_id} deleted successfully"
-            )
-        except SQLAlchemyError as e:
-            db.rollback()
-            raise HTTPException(
-                status_code=500,
-                detail=f"Database error occurred: {str(e)}",
-            )
-
-    def delete_product_by_name(self, product_name: str, db: Session):
-        """
-        Deletes a product by its name.
-        """
-        product = db.query(Product).filter(func.lower(Product.prod_name) == func.lower(product_name)).first()
-        if not product:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Product with name '{product_name}' not found",
-            )
-        
-        try:
-            db.delete(product)
-            db.commit()
-            return ResponseModel(
-                code=200,
-                status="Success",
-                message=f"Product with name '{product_name}' deleted successfully"
-            )
-        except SQLAlchemyError as e:
-            db.rollback()
-            raise HTTPException(
-                status_code=500,
-                detail=f"Database error occurred: {str(e)}",
-            )
-
-    def delete_all_products(self, db: Session):
-        """
-        Deletes all products from the database.
-        """
-        try:
-            num_deleted = db.query(Product).delete()
-            db.commit()
-            return ResponseModel(
-                code=200,
-                status="Success",
-                message=f"All products deleted successfully. Total deleted: {num_deleted}",
-            )
-        except SQLAlchemyError as e:
-            db.rollback()
-            raise HTTPException(
-                status_code=500,
-                detail=f"Database error occurred: {str(e)}",
-            )
-            
-    def get_product_by_id(self, product_id: int, db: Session) -> Dict:
-        """
-        Fetch a product by its ID and return it in a serialized format.
-        """
-        product = db.query(Product).filter(Product.prod_id == product_id).first()
-        if not product:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Product with ID {product_id} not found"
-            )
-        # Serialize the product
-        return {
-            "id": product.prod_id,  # Changed key name to match the format in `get_product`
-            "name": product.prod_name,
-            "price": product.unit_price,
-            "amount": product.amount,
-        }
-    def get_product_by_name(self, product_name: str, db: Session) -> List[Dict]:
-        """
-        Fetch products by their name and return them in a serialized format.
-        """
-        products = db.query(Product).filter(Product.prod_name.ilike(f"%{product_name}%")).all()
-        if not products:
-            raise HTTPException(
-                status_code=404,
-                detail=f"No products found with name '{product_name}'"
-            )
-        # Serialize the products
-        return [
-            {
-                "id": product.prod_id,  # Changed key name to match the format in `get_product`
-                "name": product.prod_name,
-                "price": product.unit_price,
-                "amount": product.amount,
-            }
-            for product in products
-        ]
-    

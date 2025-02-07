@@ -1,5 +1,5 @@
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -14,6 +14,7 @@ router = APIRouter(
 )
 
 staff = Staff()
+staff_service = Staff()
 
 """ Manage Client """
 @router.post("/client", response_model=ResponseModel)
@@ -58,59 +59,3 @@ def create_pawn(pawn_info: CreatePawn, db: Session = Depends(get_db), current_us
 def get_pawn_by_id(cus_id: Optional[int] = None, cus_name: Optional[str] = None, phone_number: Optional[str] = None, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     staff.is_staff(current_user)
     return staff.get_client_pawn(db, cus_id, cus_name, phone_number)
-
-"""Delete product by ID"""
-@router.delete("/products/{product_id}")
-def delete_product_by_id(
-    product_id: int, 
-    db: Session = Depends(get_db), 
-    current_user: dict = Depends(get_current_user)
-):
-    staff.is_staff(current_user)
-    return staff.delete_product_by_id(product_id, db)
-
-"""Delete product by name"""
-@router.delete("/products/name/{product_name}")
-def delete_product_by_name(
-    product_name: str, 
-    db: Session = Depends(get_db), 
-    current_user: dict = Depends(get_current_user)
-):
-    staff.is_staff(current_user)
-    return staff.delete_product_by_name(product_name, db)
-
-"""Delete all products"""
-@router.delete("/products")
-def delete_all_products(
-    db: Session = Depends(get_db), 
-    current_user: dict = Depends(get_current_user)
-):
-    staff.is_staff(current_user)
-    return staff.delete_all_products(db)
-
-@router.get("/products/search/{search_input}", response_model=ResponseModel)
-def search_product(
-    search_input: str,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
-    staff.is_staff(current_user)
-    try:
-        if search_input.isdigit():
-            product = staff.get_product_by_id(int(search_input), db)
-            return ResponseModel(
-                code=200,
-                status="success",
-                message="Product retrieved successfully",
-                result=product,
-            )
-        else:
-            products = staff.get_product_by_name(search_input, db)
-            return ResponseModel(
-                code=200,
-                status="success",
-                message="Products retrieved successfully",
-                result=products,
-            )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
